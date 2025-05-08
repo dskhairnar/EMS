@@ -3,7 +3,7 @@ import User from '../models/User.js'; // Ensure this path is correct
 
 const verifyUser = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1]; // Extract the token from the Authorization header
+    const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
@@ -27,4 +27,4 @@ const verifyUser = async (req, res, next) => {
   }
 };
 
-export default verifyUser; // Keep this as is if you want to keep the name as verifyUser
+export default verifyUser;
