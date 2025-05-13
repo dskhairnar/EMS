@@ -4,6 +4,7 @@ const auth = require("../middleware/auth");
 const Employee = require("../models/Employee");
 const Attendance = require("../models/Attendance");
 const Leave = require("../models/Leave");
+const Payslip = require("../models/Payslip");
 
 // Get employee profile
 router.get("/profile", auth, async (req, res) => {
@@ -83,6 +84,25 @@ router.get("/", auth, async (req, res) => {
       success: false,
       message: "Server error",
     });
+  }
+});
+
+// Get all attendance records (admin only)
+router.get("/attendance/all", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
+    }
+    const attendance = await Attendance.find()
+      .sort({ date: -1 })
+      .populate("employee", "firstName lastName email");
+    res.json({ success: true, attendance });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch attendance data" });
   }
 });
 
@@ -236,6 +256,263 @@ router.post("/leaves", auth, async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to submit leave request" });
+  }
+});
+
+// Generate reports (admin only)
+router.get("/reports/attendance", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
+    }
+
+    const { month, year } = req.query;
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const attendance = await Attendance.find({
+      date: { $gte: startDate, $lte: endDate },
+    })
+      .populate("employee", "firstName lastName email department")
+      .sort({ date: 1 });
+
+    // Group attendance by employee
+    const report = attendance.reduce((acc, record) => {
+      const employeeId = record.employee._id;
+      if (!acc[employeeId]) {
+        acc[employeeId] = {
+          employee: record.employee,
+          present: 0,
+          absent: 0,
+          late: 0,
+          total: 0,
+        };
+      }
+      acc[employeeId][record.status]++;
+      acc[employeeId].total++;
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      report: Object.values(report),
+      period: { month, year },
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate attendance report",
+    });
+  }
+});
+
+router.get("/reports/leave", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
+    }
+
+    const { month, year } = req.query;
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const leaves = await Leave.find({
+      startDate: { $lte: endDate },
+      endDate: { $gte: startDate },
+    })
+      .populate("employee", "firstName lastName email department")
+      .sort({ startDate: 1 });
+
+    // Group leaves by employee
+    const report = leaves.reduce((acc, leave) => {
+      const employeeId = leave.employee._id;
+      if (!acc[employeeId]) {
+        acc[employeeId] = {
+          employee: leave.employee,
+          approved: 0,
+          pending: 0,
+          rejected: 0,
+          total: 0,
+        };
+      }
+      acc[employeeId][leave.status]++;
+      acc[employeeId].total++;
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      report: Object.values(report),
+      period: { month, year },
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to generate leave report" });
+  }
+});
+
+router.get("/reports/department", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
+    }
+
+    const employees = await Employee.find()
+      .populate("department", "name")
+      .select("-password");
+
+    // Group employees by department
+    const report = employees.reduce((acc, employee) => {
+      const deptId = employee.department?._id || "No Department";
+      if (!acc[deptId]) {
+        acc[deptId] = {
+          department: employee.department?.name || "No Department",
+          total: 0,
+          positions: {},
+        };
+      }
+      acc[deptId].total++;
+      acc[deptId].positions[employee.position] =
+        (acc[deptId].positions[employee.position] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      report: Object.values(report),
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate department report",
+    });
+  }
+});
+
+// Get employee payslips
+router.get("/payslips", auth, async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const payslips = await Payslip.find({
+      employee: req.user.id,
+      date: { $gte: startDate, $lte: endDate },
+    }).sort({ date: -1 });
+
+    res.json({ success: true, payslips });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch payslips" });
+  }
+});
+
+// Download payslip
+router.get("/payslips/:id/download", auth, async (req, res) => {
+  try {
+    const payslip = await Payslip.findOne({
+      _id: req.params.id,
+      employee: req.user.id,
+    }).populate("employee", "firstName lastName email department");
+
+    if (!payslip) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Payslip not found" });
+    }
+
+    // TODO: Generate PDF using a library like PDFKit
+    // For now, we'll just send the payslip data
+    res.json({
+      success: true,
+      payslip: {
+        ...payslip.toObject(),
+        employee: payslip.employee,
+      },
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to download payslip" });
+  }
+});
+
+// Get all leave requests (admin only)
+router.get("/leaves/all", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
+    const { status } = req.query;
+    const query = status && status !== "all" ? { status } : {};
+
+    const leaves = await Leave.find(query)
+      .populate("employee", "firstName lastName email department")
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, leaves });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch leave requests",
+    });
+  }
+});
+
+// Update leave status (admin only)
+router.put("/leaves/:id/status", auth, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
+    const { status } = req.body;
+    if (!["approved", "rejected"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status",
+      });
+    }
+
+    const leave = await Leave.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    ).populate("employee", "firstName lastName email department");
+
+    if (!leave) {
+      return res.status(404).json({
+        success: false,
+        message: "Leave request not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Leave status updated successfully",
+      leave,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update leave status",
+    });
   }
 });
 
