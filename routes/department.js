@@ -106,7 +106,7 @@ router.delete("/:id", auth, async (req, res) => {
       });
     }
 
-    await department.remove();
+    await Department.deleteOne({ _id: req.params.id });
     res.json({
       success: true,
       message: "Department removed",
