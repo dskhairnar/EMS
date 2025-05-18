@@ -1,17 +1,46 @@
-const express = require("express");
+import express from "express";
+import auth from "../middleware/auth.js";
+import Department from "../models/Department.js";
+
 const router = express.Router();
-const auth = require("../middleware/auth");
-const Department = require("../models/Department");
 
 // Get all departments
 router.get("/", auth, async (req, res) => {
   try {
     const departments = await Department.find();
-    res.json({ success: true, departments });
+    res.json({
+      success: true,
+      departments,
+    });
   } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch departments" });
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
+// Get department by ID
+router.get("/:id", auth, async (req, res) => {
+  try {
+    const department = await Department.findById(req.params.id);
+    if (!department) {
+      return res.status(404).json({
+        success: false,
+        message: "Department not found",
+      });
+    }
+    res.json({
+      success: true,
+      department,
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
@@ -24,11 +53,16 @@ router.post("/", auth, async (req, res) => {
       description,
     });
     await department.save();
-    res.json({ success: true, department });
+    res.json({
+      success: true,
+      department,
+    });
   } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to create department" });
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
@@ -36,39 +70,54 @@ router.post("/", auth, async (req, res) => {
 router.put("/:id", auth, async (req, res) => {
   try {
     const { name, description } = req.body;
-    const department = await Department.findByIdAndUpdate(
-      req.params.id,
-      { name, description },
-      { new: true }
-    );
+    const department = await Department.findById(req.params.id);
     if (!department) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Department not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Department not found",
+      });
     }
-    res.json({ success: true, department });
+
+    if (name) department.name = name;
+    if (description) department.description = description;
+
+    await department.save();
+    res.json({
+      success: true,
+      department,
+    });
   } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to update department" });
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
 // Delete department
 router.delete("/:id", auth, async (req, res) => {
   try {
-    const department = await Department.findByIdAndDelete(req.params.id);
+    const department = await Department.findById(req.params.id);
     if (!department) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Department not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Department not found",
+      });
     }
-    res.json({ success: true, message: "Department deleted successfully" });
+
+    await department.remove();
+    res.json({
+      success: true,
+      message: "Department removed",
+    });
   } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to delete department" });
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
-module.exports = router;
+export default router;

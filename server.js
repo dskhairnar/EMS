@@ -3,6 +3,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 
+// Import routes
+import authRoutes from "./routes/auth.js";
+import employeeRoutes from "./routes/employeeRoutes.js";
+import departmentRoutes from "./routes/department.js";
+
 // Load environment variables
 dotenv.config();
 
@@ -45,6 +50,9 @@ const connectDB = async () => {
 connectDB();
 
 // Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/employee", employeeRoutes);
+app.use("/api/department", departmentRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

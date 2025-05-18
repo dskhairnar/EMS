@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const payslipSchema = new mongoose.Schema(
   {
@@ -7,8 +7,14 @@ const payslipSchema = new mongoose.Schema(
       ref: "Employee",
       required: true,
     },
-    date: {
-      type: Date,
+    month: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 12,
+    },
+    year: {
+      type: Number,
       required: true,
     },
     basicSalary: {
@@ -19,23 +25,9 @@ const payslipSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    overtime: {
+    deductions: {
       type: Number,
       default: 0,
-    },
-    deductions: {
-      tax: {
-        type: Number,
-        default: 0,
-      },
-      insurance: {
-        type: Number,
-        default: 0,
-      },
-      other: {
-        type: Number,
-        default: 0,
-      },
     },
     netSalary: {
       type: Number,
@@ -46,17 +38,14 @@ const payslipSchema = new mongoose.Schema(
       enum: ["pending", "paid"],
       default: "pending",
     },
-    generatedAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
     timestamps: true,
   }
 );
 
-// Create compound index for employee and date
-payslipSchema.index({ employee: 1, date: 1 }, { unique: true });
+// Create compound index for employee, month, and year
+payslipSchema.index({ employee: 1, month: 1, year: 1 }, { unique: true });
 
-module.exports = mongoose.model("Payslip", payslipSchema); 
+const Payslip = mongoose.model("Payslip", payslipSchema);
+export default Payslip;
