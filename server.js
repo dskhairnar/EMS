@@ -1,7 +1,7 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const dotenv = require("dotenv");
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import mongoose from "mongoose";
 
 // Load environment variables
 dotenv.config();
@@ -45,9 +45,6 @@ const connectDB = async () => {
 connectDB();
 
 // Routes
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/employee", require("./routes/employeeRoutes"));
-app.use("/api/department", require("./routes/department"));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -60,4 +57,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
- 

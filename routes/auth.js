@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const Employee = require("../models/Employee");
+const User = require("../models/User");
 const auth = require("../middleware/auth");
 
 // Register employee
@@ -10,17 +10,25 @@ router.post("/register", async (req, res) => {
   try {
     const { firstName, lastName, email, password, role } = req.body;
 
-    // Check if employee already exists
-    let employee = await Employee.findOne({ email });
-    if (employee) {
+    // Validate input
+    if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Employee already exists",
+        message: "All fields are required",
       });
     }
 
-    // Create new employee
-    employee = new Employee({
+    // Check if user already exists
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({
+        success: false,
+        message: "User already exists",
+      });
+    }
+
+    // Create new user
+    user = new User({
       firstName,
       lastName,
       email,
@@ -30,15 +38,15 @@ router.post("/register", async (req, res) => {
 
     // Hash password
     const salt = await bcrypt.genSalt(10);
-    employee.password = await bcrypt.hash(password, salt);
+    user.password = await bcrypt.hash(password, salt);
 
-    // Save employee
-    await employee.save();
+    // Save user
+    await user.save();
 
     // Create JWT token
     const payload = {
-      id: employee.id,
-      role: employee.role,
+      id: user.id,
+      role: user.role,
     };
 
     jwt.sign(
