@@ -25,9 +25,13 @@ const auth = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Add user from payload
-    req.user = decoded;
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+    };
     next();
   } catch (err) {
+    console.error("Auth middleware error:", err.message);
     res.status(401).json({
       success: false,
       message: "Token is not valid",
