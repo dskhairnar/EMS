@@ -61,6 +61,63 @@ router.get("/profile", auth, async (req, res) => {
   }
 });
 
+// Update employee profile
+router.put("/profile", auth, async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      console.error("No user ID in request:", req.user);
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    const { firstName, lastName, phone, address } = req.body;
+
+    // Validate required fields
+    if (!firstName || !lastName) {
+      return res.status(400).json({
+        success: false,
+        message: "First name and last name are required",
+      });
+    }
+
+    // Find and update the employee
+    const employee = await Employee.findById(req.user.id);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+
+    // Update allowed fields only
+    if (firstName) employee.firstName = firstName;
+    if (lastName) employee.lastName = lastName;
+    if (phone !== undefined) employee.phone = phone;
+    if (address !== undefined) employee.address = address;
+
+    await employee.save();
+
+    // Return updated employee without password
+    const updatedEmployee = await Employee.findById(req.user.id)
+      .select("-password")
+      .populate("department", "name");
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      employee: updatedEmployee,
+    });
+  } catch (err) {
+    console.error("Update profile route error:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
 // Get employee attendance
 router.get("/attendance", auth, async (req, res) => {
   try {
