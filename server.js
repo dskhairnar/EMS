@@ -20,8 +20,16 @@ console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
 // Create Express app
 const app = express();
 
+// CORS configuration
+const corsOptions = {
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://your-frontend-domain.com'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // MongoDB connection options
@@ -56,8 +64,20 @@ app.use("/api/department", departmentRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send("Something broke!");
+  console.error('Error:', err.stack);
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Handle 404 errors
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found"
+  });
 });
 
 // Start server

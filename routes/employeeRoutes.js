@@ -64,6 +64,9 @@ router.get("/profile", auth, async (req, res) => {
 // Update employee profile
 router.put("/profile", auth, async (req, res) => {
   try {
+    console.log("PUT /profile called with user:", req.user);
+    console.log("Request body:", req.body);
+    
     if (!req.user || !req.user.id) {
       console.error("No user ID in request:", req.user);
       return res.status(401).json({
@@ -85,11 +88,14 @@ router.put("/profile", auth, async (req, res) => {
     // Find and update the employee
     const employee = await Employee.findById(req.user.id);
     if (!employee) {
+      console.error("Employee not found for ID:", req.user.id);
       return res.status(404).json({
         success: false,
         message: "Employee not found",
       });
     }
+
+    console.log("Found employee:", employee.firstName, employee.lastName);
 
     // Update allowed fields only
     if (firstName) employee.firstName = firstName;
@@ -97,13 +103,16 @@ router.put("/profile", auth, async (req, res) => {
     if (phone !== undefined) employee.phone = phone;
     if (address !== undefined) employee.address = address;
 
+    console.log("Saving employee with updates...");
     await employee.save();
+    console.log("Employee saved successfully");
 
     // Return updated employee without password
     const updatedEmployee = await Employee.findById(req.user.id)
       .select("-password")
       .populate("department", "name");
 
+    console.log("Sending response with updated employee");
     res.json({
       success: true,
       message: "Profile updated successfully",
@@ -111,6 +120,7 @@ router.put("/profile", auth, async (req, res) => {
     });
   } catch (err) {
     console.error("Update profile route error:", err.message);
+    console.error("Full error:", err);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -436,139 +446,6 @@ router.get("/reports/department", auth, async (req, res) => {
   }
 });
 
-// Get employee by ID
-router.get("/:id", auth, async (req, res) => {
-  try {
-    const employee = await Employee.findById(req.params.id).select("-password");
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee not found",
-      });
-    }
-    res.json({
-      success: true,
-      employee,
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-// Update employee
-router.put("/:id", auth, async (req, res) => {
-  try {
-    const { firstName, lastName, email, department, role } = req.body;
-    const employee = await Employee.findById(req.params.id);
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee not found",
-      });
-    }
-
-    // Update fields
-    if (firstName) employee.firstName = firstName;
-    if (lastName) employee.lastName = lastName;
-    if (email) employee.email = email;
-    if (department) employee.department = department;
-    if (role) employee.role = role;
-
-    await employee.save();
-    res.json({
-      success: true,
-      employee,
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-// Delete employee
-router.delete("/:id", auth, async (req, res) => {
-  try {
-    const employee = await Employee.findById(req.params.id);
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee not found",
-      });
-    }
-
-    await employee.remove();
-    res.json({
-      success: true,
-      message: "Employee removed",
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-// Get employee payslips by ID (admin only)
-router.get("/:id/payslips", auth, async (req, res) => {
-  try {
-    const payslips = await Payslip.find({ employee: req.params.id });
-    res.json({
-      success: true,
-      payslips,
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-// Create payslip (admin only)
-router.post("/:id/payslips", auth, async (req, res) => {
-  try {
-    const { month, year, basicSalary, allowances, deductions } = req.body;
-    const employee = await Employee.findById(req.params.id);
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee not found",
-      });
-    }
-
-    const payslip = new Payslip({
-      employee: req.params.id,
-      month,
-      year,
-      basicSalary,
-      allowances,
-      deductions,
-    });
-
-    await payslip.save();
-    res.json({
-      success: true,
-      payslip,
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
 // Mark attendance
 router.post("/attendance/mark", auth, async (req, res) => {
   try {
@@ -660,6 +537,139 @@ router.post("/leaves", auth, async (req, res) => {
     });
   } catch (err) {
     console.error("Create leave request error:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
+// Get employee by ID
+router.get("/:id", auth, async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id).select("-password");
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+    res.json({
+      success: true,
+      employee,
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
+// Update employee
+router.put("/:id", auth, async (req, res) => {
+  try {
+    const { firstName, lastName, email, department, role } = req.body;
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+
+    // Update fields
+    if (firstName) employee.firstName = firstName;
+    if (lastName) employee.lastName = lastName;
+    if (email) employee.email = email;
+    if (department) employee.department = department;
+    if (role) employee.role = role;
+
+    await employee.save();
+    res.json({
+      success: true,
+      employee,
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
+// Delete employee
+router.delete("/:id", auth, async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+
+    await Employee.findByIdAndDelete(req.params.id);
+    res.json({
+      success: true,
+      message: "Employee removed",
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
+// Get employee payslips by ID (admin only)
+router.get("/:id/payslips", auth, async (req, res) => {
+  try {
+    const payslips = await Payslip.find({ employee: req.params.id });
+    res.json({
+      success: true,
+      payslips,
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
+// Create payslip (admin only)
+router.post("/:id/payslips", auth, async (req, res) => {
+  try {
+    const { month, year, basicSalary, allowances, deductions } = req.body;
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+
+    const payslip = new Payslip({
+      employee: req.params.id,
+      month,
+      year,
+      basicSalary,
+      allowances,
+      deductions,
+    });
+
+    await payslip.save();
+    res.json({
+      success: true,
+      payslip,
+    });
+  } catch (err) {
+    console.error(err.message);
     res.status(500).json({
       success: false,
       message: "Server error",
